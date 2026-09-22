@@ -210,9 +210,16 @@ def build_vectorstore(source_dir: str) -> Chroma:
     return vectorstore
 
 
-def get_vectorstore() -> Chroma:
-    """Open an already-built vector store (for querying) without re-ingesting."""
-    embeddings = HuggingFaceEmbeddings(model_name=settings.embedding_model_id)
+def get_vectorstore(embeddings: HuggingFaceEmbeddings | None = None) -> Chroma:
+    """Open an already-built vector store (for querying) without re-ingesting.
+
+    Pass an existing HuggingFaceEmbeddings instance if the caller already
+    has one (e.g. RAGPipeline builds one for MMR's diversity term) —
+    otherwise this builds its own, which means the embedding model gets
+    loaded into memory twice for no reason.
+    """
+    if embeddings is None:
+        embeddings = HuggingFaceEmbeddings(model_name=settings.embedding_model_id)
     return Chroma(
         collection_name=settings.collection_name,
         embedding_function=embeddings,

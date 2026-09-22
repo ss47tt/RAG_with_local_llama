@@ -75,7 +75,7 @@ class RAGState(TypedDict):
     answer: str
 
 
-def _format_context(docs: List[Document]) -> str:
+def format_context(docs: List[Document]) -> str:
     parts = []
     for i, doc in enumerate(docs, start=1):
         source = doc.metadata.get("source", "unknown")
@@ -141,37 +141,134 @@ def _mmr_select(
     return [candidates[i] for i in selected_idx]
 
 
+def fuse_rrf(dense_docs: List[Document], sparse_docs: List[Document]) -> List[Document]:
+    """Reciprocal Rank Fusion: score = sum(1 / (rrf_k + rank)) across
+    every ranked list a chunk appears in. Chunks retrieved by BOTH the
+    dense and sparse retrievers naturally float to the top.
+
+    Module-level (not a method) so eval scripts can run the exact same
+    fusion logic the live pipeline uses, without needing a full
+    RAGPipeline (and its generation model) just to check retrieval
+    quality.
+    """
+    scores: dict = {}
+    lookup: dict = {}
+
+    for ranked_list in (dense_docs, sparse_docs):
+        for rank, doc in enumerate(ranked_list):
+            # Fall back to content hash if chunk_id is missing (e.g.
+            # older ingested data) so fusion still works.
+            cid = doc.metadata.get("chunk_id") or hash(doc.page_content)
+            scores[cid] = scores.get(cid, 0.0) + 1.0 / (settings.rrf_k + rank + 1)
+            lookup.setdefault(cid, doc)
+
+    ranked_ids = sorted(scores, key=lambda cid: scores[cid], reverse=True)
+    return [lookup[cid] for cid in ranked_ids[: settings.rrf_top_n]]
+
+
+def rerank_and_diversify(
+    query: str,
+    docs: List[Document],
+    cross_encoder: CrossEncoder,
+    embeddings: HuggingFaceEmbeddings,
+) -> List[Document]:
+    """Cross-encoder scoring + MMR selection down to settings.top_k.
+
+    Module-level for the same reason as fuse_rrf above — an eval
+    script can call this directly with its own (lighter-weight)
+    cross_encoder/embeddings instances.
+    """
+    if not docs:
+        return []
+
+    pairs = [(query, doc.page_content) for doc in docs]
+    relevance_scores = np.array(cross_encoder.predict(pairs))
+
+    # Embed every candidate so MMR can measure how similar each one is
+    # to what's already been picked — this is what lets it skip a 4th
+    # near-duplicate chunk in favor of something that actually covers
+    # new ground.
+    doc_embeddings = np.array(embeddings.embed_documents([doc.page_content for doc in docs]))
+
+    return _mmr_select(
+        candidates=docs,
+        relevance_scores=relevance_scores,
+        embeddings=doc_embeddings,
+        k=settings.top_k,
+        lambda_mult=settings.mmr_lambda,
+    )
+
+
+def load_llm():
+    """Load the tokenizer + generation model per config.py's settings.
+
+    Module-level so eval scripts that need occasional LLM calls (e.g.
+    testset generation) can reuse this exact loading path — including
+    the generation_config quirk-fix below — without duplicating it and
+    risking the two copies drifting apart.
+    """
+    tokenizer = AutoTokenizer.from_pretrained(
+        settings.llm_model_id,
+        clean_up_tokenization_spaces=False,
+    )
+    # Newer transformers versions accept `dtype=` instead and print a
+    # deprecation notice for `torch_dtype=` — intentionally not switched:
+    # requirements.txt only guarantees transformers>=4.45.0, and
+    # from_pretrained has historically been permissive about unrecognized
+    # kwargs (often silently absorbed rather than raising). An older
+    # supported version that doesn't yet recognize `dtype=` could end up
+    # silently loading in default fp32 instead of bf16, with no error to
+    # indicate anything went wrong. A cosmetic warning is a far smaller
+    # cost than that silent regression, so this stays as torch_dtype=
+    # until the requirements.txt floor is raised past whatever version
+    # introduced dtype=.
+    model = AutoModelForCausalLM.from_pretrained(
+        settings.llm_model_id,
+        device_map=settings.device_map,
+        torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
+    )
+    if not settings.do_sample:
+        # The checkpoint's generation_config.json ships with sampling
+        # defaults (temperature/top_p) baked in. They're meaningless
+        # under greedy decoding and transformers warns about them on
+        # every call unless we clear them here.
+        model.generation_config.temperature = None
+        model.generation_config.top_p = None
+    return tokenizer, model
+
+
+def generate_once(tokenizer, model, messages: list, max_new_tokens: int) -> str:
+    """Non-streaming single-turn generation. Shared by RAGPipeline._chat's
+    non-stream path and by eval scripts that need occasional LLM calls
+    without the streaming machinery."""
+    prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    with torch.no_grad():
+        output_ids = model.generate(
+            **inputs, max_new_tokens=max_new_tokens, do_sample=settings.do_sample
+        )
+    new_tokens = output_ids[0][inputs["input_ids"].shape[-1] :]
+    return tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
+
+
 class RAGPipeline:
     """Wraps every resource the graph depends on (vector store, BM25
     index, tokenizer/model, cross-encoder) plus the compiled graph
     itself, so they're all built once and reused across queries."""
 
     def __init__(self):
-        self.vectorstore = get_vectorstore()
-        # Reused for MMR's diversity term — same model that built the
-        # Chroma index, so chunk embeddings are directly comparable.
+        # Reused for MMR's diversity term AND for the vector store below
+        # (same model that built the Chroma index, so chunk embeddings
+        # are directly comparable) — built once and passed to
+        # get_vectorstore so the embedding model isn't loaded twice.
         self.embeddings = HuggingFaceEmbeddings(model_name=settings.embedding_model_id)
+        self.vectorstore = get_vectorstore(embeddings=self.embeddings)
 
         chunks = load_cached_chunks()
         self.bm25_retriever = BM25Retriever.from_documents(chunks)
         self.bm25_retriever.k = settings.sparse_top_k
 
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            settings.llm_model_id,
-            clean_up_tokenization_spaces=False,
-        )
-        self.model = AutoModelForCausalLM.from_pretrained(
-            settings.llm_model_id,
-            device_map=settings.device_map,
-            torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
-        )
-        if not settings.do_sample:
-            # The checkpoint's generation_config.json ships with sampling
-            # defaults (temperature/top_p) baked in. They're meaningless
-            # under greedy decoding and transformers warns about them on
-            # every call unless we clear them here.
-            self.model.generation_config.temperature = None
-            self.model.generation_config.top_p = None
+        self.tokenizer, self.model = load_llm()
 
         device = "cuda" if torch.cuda.is_available() else "cpu"
         self.cross_encoder = CrossEncoder(settings.cross_encoder_model_id, device=device)
@@ -191,6 +288,9 @@ class RAGPipeline:
         generated (via a background thread + TextIteratorStreamer) and
         the full text is also returned once generation finishes.
         """
+        if not stream:
+            return generate_once(self.tokenizer, self.model, messages, max_new_tokens)
+
         prompt = self.tokenizer.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True
         )
@@ -201,12 +301,6 @@ class RAGPipeline:
             max_new_tokens=max_new_tokens,
             do_sample=settings.do_sample,
         )
-
-        if not stream:
-            with torch.no_grad():
-                output_ids = self.model.generate(**gen_kwargs)
-            new_tokens = output_ids[0][inputs["input_ids"].shape[-1] :]
-            return self.tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
 
         streamer = TextIteratorStreamer(
             self.tokenizer, skip_prompt=True, skip_special_tokens=True
@@ -272,51 +366,16 @@ class RAGPipeline:
         return {"sparse_docs": docs}
 
     def _fuse_rrf(self, state: RAGState) -> dict:
-        """Reciprocal Rank Fusion: score = sum(1 / (rrf_k + rank)) across
-        every ranked list a chunk appears in. Chunks retrieved by BOTH
-        the dense and sparse retrievers naturally float to the top."""
-        scores: dict = {}
-        lookup: dict = {}
-
-        for ranked_list in (state["dense_docs"], state["sparse_docs"]):
-            for rank, doc in enumerate(ranked_list):
-                # Fall back to content hash if chunk_id is missing (e.g.
-                # older ingested data) so fusion still works.
-                cid = doc.metadata.get("chunk_id") or hash(doc.page_content)
-                scores[cid] = scores.get(cid, 0.0) + 1.0 / (settings.rrf_k + rank + 1)
-                lookup.setdefault(cid, doc)
-
-        ranked_ids = sorted(scores, key=lambda cid: scores[cid], reverse=True)
-        fused_docs = [lookup[cid] for cid in ranked_ids[: settings.rrf_top_n]]
-        return {"fused_docs": fused_docs}
+        return {"fused_docs": fuse_rrf(state["dense_docs"], state["sparse_docs"])}
 
     def _rerank(self, state: RAGState) -> dict:
-        docs = state["fused_docs"]
-        if not docs:
-            return {"documents": []}
-
-        pairs = [(state["rewritten_query"], doc.page_content) for doc in docs]
-        relevance_scores = np.array(self.cross_encoder.predict(pairs))
-
-        # Embed every candidate so MMR can measure how similar each one
-        # is to what's already been picked — this is what lets it skip
-        # a 4th near-duplicate chunk in favor of something that actually
-        # covers new ground.
-        doc_embeddings = np.array(
-            self.embeddings.embed_documents([doc.page_content for doc in docs])
-        )
-
-        documents = _mmr_select(
-            candidates=docs,
-            relevance_scores=relevance_scores,
-            embeddings=doc_embeddings,
-            k=settings.top_k,
-            lambda_mult=settings.mmr_lambda,
+        documents = rerank_and_diversify(
+            state["rewritten_query"], state["fused_docs"], self.cross_encoder, self.embeddings
         )
         return {"documents": documents}
 
     def _generate(self, state: RAGState) -> dict:
-        context = _format_context(state["documents"])
+        context = format_context(state["documents"])
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
         messages.extend(_history_to_messages(state["chat_history"]))
         messages.append(

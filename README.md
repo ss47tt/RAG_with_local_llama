@@ -13,12 +13,17 @@ A minimal, local-first Retrieval-Augmented Generation app:
 rag_app/
 ├── requirements.txt
 ├── README.md
-└── rag_app/
+├── rag_app/
+│   ├── __init__.py
+│   ├── config.py    # all tunables (models, chunk size, top_k, paths)
+│   ├── ingest.py     # load docs -> chunk -> embed -> persist to Chroma
+│   ├── graph.py       # the LangGraph pipeline + local LLM loading
+│   └── main.py         # interactive CLI
+└── eval/
     ├── __init__.py
-    ├── config.py    # all tunables (models, chunk size, top_k, paths)
-    ├── ingest.py     # load docs -> chunk -> embed -> persist to Chroma
-    ├── graph.py       # the LangGraph pipeline + local LLM loading
-    └── main.py         # interactive CLI
+    ├── testset.py    # generate an LLM-synthesized eval set from your own corpus
+    ├── retrieval_eval.py  # score retrieval quality (Hit Rate/MRR/nDCG) against it
+    └── generation_eval.py  # LLM-as-judge: faithfulness/relevance of the live pipeline's answers
 ```
 
 ## 1. Install
@@ -76,12 +81,14 @@ START -> rewrite_query -> retrieve_dense  \
   Fusion — chunks that rank well in *both* lists float to the top,
   without needing to normalize dense cosine scores against BM25 scores.
 - **`rerank`**: a cross-encoder (`cross-encoder/ms-marco-MiniLM-L-6-v2`)
-  scores each fused candidate directly against the *original* question,
-  which is more accurate than embedding similarity alone. Those scores
-  then feed **Maximal Marginal Relevance (MMR)**, which picks the final
-  `top_k` balancing relevance against diversity — so if 4 of the top 6
-  candidates are near-duplicate paragraphs, MMR won't let them crowd
-  out a genuinely different (but still relevant) chunk.
+  scores each fused candidate directly against the *rewritten* query
+  (not the raw question — important for follow-ups, where the raw
+  question might just be "what about that?"), which is more accurate
+  than embedding similarity alone. Those scores then feed **Maximal
+  Marginal Relevance (MMR)**, which picks the final `top_k` balancing
+  relevance against diversity — so if 4 of the top 6 candidates are
+  near-duplicate paragraphs, MMR won't let them crowd out a genuinely
+  different (but still relevant) chunk.
 - **`generate`**: Llama answers using the reranked context — plus the
   last `max_history_turns` prior (question, answer) turns, so
   follow-ups like "what about the 70B version?" work — streamed
@@ -131,3 +138,78 @@ Everything tunable lives in `config.py`:
   are already independent nodes; swapping `app.invoke` for
   `app.ainvoke` with async node functions would let them run
   concurrently instead of sequentially.
+
+## Evaluating retrieval quality
+
+Public QA datasets (HotpotQA, NQ, BEIR, ...) are built on their own
+fixed corpora, so they mostly tell you whether Llama is generally good
+at QA — not whether *your* pipeline finds the right chunk in *your*
+documents. Instead, generate a testset from your own ingested corpus:
+
+```bash
+python -m rag_app.ingest ./my_docs          # if you haven't already
+python -m eval.testset --n 30 --output eval/testset.json
+```
+
+This samples random chunks from `chroma_db`, asks Llama to write one
+question each chunk directly answers, and records that chunk's
+`chunk_id` as ground truth. Re-run it any time you re-ingest different
+documents — the testset stays relevant automatically.
+
+Then score retrieval quality at every pipeline stage against it:
+
+```bash
+python -m eval.retrieval_eval --testset eval/testset.json
+```
+
+This reports **Hit Rate@k**, **MRR**, and **nDCG@k** separately for
+`dense`, `sparse`, `fused` (post-RRF), and `final` (post-rerank+MMR) —
+so you can tell, e.g., whether reranking is actually improving things
+or whether BM25 is pulling its weight at all, rather than tuning
+`config.py` by eyeballing single questions in the terminal. It skips
+loading the 3B generation model entirely (retrieval evaluation doesn't
+need it), so it's much faster to iterate on than a full chat session.
+
+Note this only evaluates *retrieval* (did we find the right chunk),
+not *generation* (did the model use it well) — those are genuinely
+separate failure modes worth measuring separately, which is what
+`eval/generation_eval.py` is for.
+
+## Evaluating generation quality
+
+Retrieval can succeed — the right chunk comes back — and generation
+can still fail on top of that: the model might ignore the chunk,
+fabricate something beyond it, or answer a different question than
+the one asked. `eval/retrieval_eval.py` has no way to catch that,
+since it only checks whether the right chunk was *retrieved*.
+
+```bash
+python -m eval.generation_eval --testset eval/testset.json
+```
+
+This runs the **full live pipeline** (retrieval through generation)
+for each testset question, then has an LLM judge score the resulting
+answer on two dimensions, 1-5 each:
+
+- **Faithfulness** — is every claim in the answer actually supported
+  by the context that was retrieved for it? This is the hallucination
+  check. An answer that correctly says "the context doesn't cover
+  this" scores well here even if it doesn't satisfy the question —
+  that's a relevance problem, not a faithfulness one.
+- **Relevance** — does the answer actually address the question
+  asked? A fully faithful answer can still be non-responsive.
+
+It prints a running average of both scores, and separately flags any
+answer scoring ≤2 on either dimension so you can go read the actual
+question/answer/reasoning rather than staring at an aggregate number.
+
+The judge is the **same local Llama-3.2-3B-Instruct** already loaded
+for generation — reused via `generate_once`, not a second copy (loading
+the model twice would likely blow a modest VRAM budget). Worth being
+upfront about the tradeoff: a 3B model judging its own outputs is a
+weaker, more self-correlated signal than an independent stronger judge
+would give you — it can share the same blind spots it's supposed to
+be catching. If you get API access to a larger model later, swapping
+the judge call in `eval/generation_eval.py`'s `_judge()` for an API
+request is the natural upgrade path — nothing else in the script
+(parsing, aggregation, flagging) needs to change.

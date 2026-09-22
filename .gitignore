@@ -1,6 +1,5 @@
 # Python
 __pycache__/
-chroma_db
 
 # Virtual environments
 .venv/

@@ -1,0 +1,182 @@
+[
+  {
+    "question": "What is the typical length of the chunks of documents used to generate synthetic question-answering data?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::23::4b4a5d84ca7d",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 23
+  },
+  {
+    "question": "What proportion of data sources should be included in the pre-training data mix to ensure a high-quality language model?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::5::26f370a5cd6d",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 5
+  },
+  {
+    "question": "What type of models are used to filter out non-English texts from the video dataset?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::55::102757654706",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 55
+  },
+  {
+    "question": "What is the advantage of human labels over LLM-annotated labels for borderline prompts?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::48::a1cc0b01a640",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 48
+  },
+  {
+    "question": "How many percent of spear phishing attempts was Llama 3 70B successful in?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::45::70d095bddc48",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 45
+  },
+  {
+    "question": "What is the capability category for which the results of the pre-trained Llama 3 8B and 70B models are aggregated?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::29::9f855ef5a4f2",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 29
+  },
+  {
+    "question": "What percentage of the Llama 3 pre-training data mix consists of non-English tokens?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::21::8e1cc8947409",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 21
+  },
+  {
+    "question": "What specific phrases were identified as overly-apologetic and targeted for reduction in the dataset?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::17::5e6b1aeca40d",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 17
+  },
+  {
+    "question": "Who are the authors of the paper \"Scaling language models: Methods, analysis & insights from training gopher\"?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::85::00f751fc2e3f",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 85
+  },
+  {
+    "question": "What is the specific correlation used in the second stage of the methodology to predict downstream task performance?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::6::98dcaba88ea9",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 6
+  },
+  {
+    "question": "What is the new token vocabulary size of the Llama 3 model?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::6::608613e4498c",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 6
+  },
+  {
+    "question": "What type of sources were used to sample random code snippets for generating programming problem descriptions?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::19::5c06e5b2748e",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 19
+  },
+  {
+    "question": "What is the effect of fine-tuning models on SFT datasets on the impact of longer context attacks?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::44::a3a4290dc198",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 44
+  },
+  {
+    "question": "What type of participants are assigned to teams in the study?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::46::3ff5132b3e9f",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 46
+  },
+  {
+    "question": "What percentage improvement in performance did annealing achieve on the GSM8k validation set for a pre-trained Llama 3 8B model?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::5::972a13f921a9",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 5
+  },
+  {
+    "question": "What are the average memorization rates for the 405B model with n = 50 and n = 1000?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::41::98304ab5a12c",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 41
+  },
+  {
+    "question": "What is the title of the multilingual dataset for speech research mentioned in the first entry?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::84::4ae88966f6a2",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 84
+  },
+  {
+    "question": "Is Llama 405B significantly safer than the Comp. 1 system?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::45::e1b694339a16",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 45
+  },
+  {
+    "question": "What is the name of the dataset used to evaluate the understanding of complex web videos via question answering?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::90::ebe6c1ae35ee",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 90
+  },
+  {
+    "question": "How many pixels is the largest image size that the image adapter can handle?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::56::7c868bd9d5dc",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 56
+  },
+  {
+    "question": "What type of model architecture does the authors prefer to use for their model development process?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::1::1761b2353863",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 1
+  },
+  {
+    "question": "What is the minimum length of n required to obtain a good estimate for certain models?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::33::bb3ac97a53b8",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 33
+  },
+  {
+    "question": "What is the key advantage of the Llama 3 8B prosody model that enables more responsive and real-time speech synthesis?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::68::7002619f1a35",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 68
+  },
+  {
+    "question": "What percentage of tokens in a contaminated dataset are considered part of an 8-gram occurring at least once in the pre-training corpus?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::33::88a10b58115d",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 33
+  },
+  {
+    "question": "What is the balance that Llama 3 aims to achieve between its violation rate and false refusal rate?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::44::a0151fc4a4e0",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 44
+  },
+  {
+    "question": "How many parameters does Llama 3 8B have compared to Llama 3 70B?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::67::2a79c9bb214b",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 67
+  },
+  {
+    "question": "How many synthetic examples of SFT dialogs were generated using Llama 3 and the code expert?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::18::1411fe3016c3",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 18
+  },
+  {
+    "question": "What is the name of the journal where the paper \"Palm: Scaling language modeling with pathways\" was published?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::76::4d934f49a14a",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 76
+  },
+  {
+    "question": "What is the approximate number of synthetic data points generated using the backtranslation procedure?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::19::45e8ec1a8343",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 19
+  },
+  {
+    "question": "Who is the person named Jian Jin?",
+    "chunk_id": "my_docs\\The Llama 3 Herd of Models.pdf::72::aa715989a530",
+    "source": "my_docs\\The Llama 3 Herd of Models.pdf",
+    "page": 72
+  }
+]
