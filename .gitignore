@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+chroma_db
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# HuggingFace cache
+.cache/
+
+# OS
+.DS_Store
+Thumbs.db
